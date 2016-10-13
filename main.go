@@ -39,8 +39,6 @@ func (i *iniFile) Load(filename string) error {
 func (steam *steamUser) updateData(token, id string) (bool, error){
     resp, err := resty.R().SetQueryParams(map[string]string{"key": token, "steamids": id}).Get("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?")
 
-    fmt.Println("Steam StatusCode: ", resp.StatusCode())
-
     if err != nil {
         return false, err
     }
