@@ -5,118 +5,109 @@ import (
     "gopkg.in/resty.v0"
     "encoding/json"
     "time"
-    "flag"
     "github.com/go-ini/ini"
-    "github.com/cratonica/trayhost"
-	"runtime"
 )
 
 var steamStatusName = [7]string {"Offline", "Online", "Busy", "Away", "Snooze", "Trading", "Looking to play"}
 
-type userJSON struct {
-    Response struct {
-        Players []struct {
-            NickName string `json:"personaname"`
-            SteamStatus int `json:"personastate"`
-            GameName string `json:"gameextrainfo"`
-        } `json:"players"`
-    } `json:"response"`
+type steamUser struct {
+    nickName string
+    gameName string
+    statusID int
 }
-type steamu struct {
-    Nickname string
-    Status string
-    GameName string
-}
-func setStatus(vktoken, text string) {
 
-    _, err := resty.R().
-      SetQueryParams(map[string]string{
-          "access_token": vktoken,
-          "text": text,
-      }).
-      Get("https://api.vk.com/method/status.set?")
+type iniFile struct {
+    tokenSteam  string
+    tokenVk     string
+    idSteam64   string
+}
+
+func (i *iniFile) Load(filename string) error {
+	file, err := ini.InsensitiveLoad(filename)
+
+	if err != nil {
+		return err
+	}
+
+    i.tokenVk = file.Section("settings").Key("vktoken").String()
+    i.tokenSteam = file.Section("settings").Key("steamtoken").String()
+    i.idSteam64 = file.Section("settings").Key("steamid").String()
+
+    return nil
+}
+
+func (steam *steamUser) updateData(token, id string) (bool, error){
+    resp, err := resty.R().SetQueryParams(map[string]string{"key": token, "steamids": id}).Get("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?")
+
+    fmt.Println("Steam StatusCode: ", resp.StatusCode())
 
     if err != nil {
-        fmt.Println(err)
+        return false, err
     }
-}
- 
-func getSteamInfo(token, steamid string) (string, string, string) {
-    resp, err := resty.R().
-      SetQueryParams(map[string]string{
-          "key": token,
-          "steamids": steamid,
-      }).
-      Get("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002")
 
-    if err != nil {
-        fmt.Println(err)
+    type userJSON struct {
+        Response struct {
+            Players []struct {
+                Name string `json:"personaname"`
+                Status int `json:"personastate"`
+                GameName string `json:"gameextrainfo"`
+            } `json:"players"`
+        } `json:"response"`
     }
 
 	var steamuser userJSON    
 
     if err := json.Unmarshal(resp.Body(), &steamuser); err != nil {
-        fmt.Println(err)
+        return false, err
+    }    
+
+    if  steam.nickName == steamuser.Response.Players[0].Name && 
+        steam.gameName == steamuser.Response.Players[0].GameName && 
+        steam.statusID == steamuser.Response.Players[0].Status {
+        return true, nil
     }
 
-    return steamuser.Response.Players[0].NickName, steamuser.Response.Players[0].GameName, steamStatusName[steamuser.Response.Players[0].SteamStatus]
-}
+    steam.nickName = steamuser.Response.Players[0].Name
+    steam.gameName = steamuser.Response.Players[0].GameName
+    steam.statusID = steamuser.Response.Players[0].Status
 
-func process(steamtoken, steamid, vktoken string) {
-	var nickname, gamename, status, text string
-
-	trayhost.SetUrl("https://github.com/sampwork")
-
-	u := new(steamu)
-
-	for range time.Tick(30 * time.Second) {
-		nickname, gamename, status = getSteamInfo(steamtoken, steamid)
-
-		if u.Nickname == nickname && u.GameName == gamename && u.Status == status {
-			continue
-		}
-		
-		text = "Steam: " + nickname + "(" + status + ")"
-		
-		if (gamename != "") {
-			text += " playing: " + gamename
-		}
-
-		setStatus(vktoken, text)
-
-		u.Nickname = nickname
-		u.GameName = gamename
-		u.Status = status
-	}
+    return false, nil
 }
 
 func main() {
-	runtime.LockOSThread()
+    fmt.Println("started...")
 
-	flag.Parse()
+    ini := new(iniFile)
 
-	cfg, err := ini.InsensitiveLoad("settings.ini")
+    err := ini.Load("settings.ini")
 
-	if err != nil {
-		fmt.Println(err)
-	}
+    if err != nil {
+        fmt.Println("inifile: ", err)
+    }
 
-	steamtoken := cfg.Section("settings").Key("steamtoken").String()
-	steamid := cfg.Section("settings").Key("steamid").String()
-	vktoken := cfg.Section("settings").Key("vktoken").String()
+    steam := new(steamUser)
 
-	if flag.NArg() == 3 {
-		steamtoken = flag.Arg(0)
-		steamid = flag.Arg(1)
-		vktoken = flag.Arg(2)
-	} 
-	
-	if steamtoken == "" || steamid == "" || vktoken == "" {
-		fmt.Println("Update settings")
-		return
-	}
+    for range time.Tick(30 * time.Second) {
+        result, err := steam.updateData(ini.tokenSteam, ini.idSteam64)
 
-	go process(steamtoken, steamid, vktoken)
+        if err != nil {
+            fmt.Println("steamupdate: ", err)
+        }
 
-	trayhost.EnterLoop("VkStatus", iconData)
+        if result == true {
+            continue
+        }
+
+        statusText := "Steam: " + steam.nickName + "(" + steamStatusName[steam.statusID] + ")"
+
+        if steam.gameName != "" {
+            statusText += " playing: " + steam.gameName
+        }
+
+        _, err = resty.R().SetQueryParams(map[string]string{"access_token": ini.tokenVk, "text": statusText}).Get("https://api.vk.com/method/status.set?")
+
+        if err != nil {
+            fmt.Println("setvkstatus: ", err)
+        }
+    }
 }
