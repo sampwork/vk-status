@@ -26,7 +26,7 @@ func (i *iniFile) Load(filename string) error {
     file, err := ini.InsensitiveLoad(filename)
 
     if err != nil {
-		return err
+        return err
     }
 
     i.tokenVk = file.Section("settings").Key("vktoken").String()
