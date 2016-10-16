@@ -57,7 +57,7 @@ func (steam *steamUser) updateData(token, id string) (bool, bool, error){
         } `json:"response"`
     }
 
-	var steamuser userJSON    
+    var steamuser userJSON    
 
     if err := json.Unmarshal(resp.Body(), &steamuser); err != nil {
         return false, false, err
