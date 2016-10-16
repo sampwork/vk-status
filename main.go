@@ -36,13 +36,17 @@ func (i *iniFile) Load(filename string) error {
     return nil
 }
 
-func (steam *steamUser) updateData(token, id string) (bool, error){
+func (steam *steamUser) updateData(token, id string) (bool, bool, error){
     resp, err := resty.R().SetQueryParams(map[string]string{"key": token, "steamids": id}).Get("http://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?")
 
     if err != nil {
-        return false, err
+        return false, false, err
     }
 
+    if resp.StatusCode() != 200 {
+        fmt.Println("steam status code: ", resp.StatusCode())
+        return false, true, nil
+    }
     type userJSON struct {
         Response struct {
             Players []struct {
@@ -56,20 +60,20 @@ func (steam *steamUser) updateData(token, id string) (bool, error){
 	var steamuser userJSON    
 
     if err := json.Unmarshal(resp.Body(), &steamuser); err != nil {
-        return false, err
+        return false, false, err
     }    
 
     if  steam.nickName == steamuser.Response.Players[0].Name && 
         steam.gameName == steamuser.Response.Players[0].GameName && 
         steam.statusID == steamuser.Response.Players[0].Status {
-        return true, nil
+        return true, false, nil
     }
 
     steam.nickName = steamuser.Response.Players[0].Name
     steam.gameName = steamuser.Response.Players[0].GameName
     steam.statusID = steamuser.Response.Players[0].Status
 
-    return false, nil
+    return false, false, nil
 }
 
 func main() {
@@ -86,13 +90,14 @@ func main() {
     steam := new(steamUser)
 
     for range time.Tick(30 * time.Second) {
-        result, err := steam.updateData(ini.tokenSteam, ini.idSteam64)
+        doNotUpdate, status, err := steam.updateData(ini.tokenSteam, ini.idSteam64)
 
         if err != nil {
-            fmt.Println("steamupdate: ", err)
+            fmt.Println("get steam data err: ", err)
+            continue
         }
 
-        if result == true {
+        if doNotUpdate || status {
             continue
         }
 
@@ -105,7 +110,7 @@ func main() {
         _, err = resty.R().SetQueryParams(map[string]string{"access_token": ini.tokenVk, "text": statusText}).Get("https://api.vk.com/method/status.set?")
 
         if err != nil {
-            fmt.Println("setvkstatus: ", err)
+            fmt.Println("set vk status err: ", err)
         }
     }
 }
