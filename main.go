@@ -25,9 +25,9 @@ type iniFile struct {
 func (i *iniFile) Load(filename string) error {
     file, err := ini.InsensitiveLoad(filename)
 
-	if err != nil {
-		return err
-	}
+    if err != nil {
+        return err
+    }
 
     i.tokenVk = file.Section("settings").Key("vktoken").String()
     i.tokenSteam = file.Section("settings").Key("steamtoken").String()
