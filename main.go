@@ -23,11 +23,11 @@ type iniFile struct {
 }
 
 func (i *iniFile) Load(filename string) error {
-    file, err := ini.InsensitiveLoad(filename)
+	file, err := ini.InsensitiveLoad(filename)
 
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
     i.tokenVk = file.Section("settings").Key("vktoken").String()
     i.tokenSteam = file.Section("settings").Key("steamtoken").String()
@@ -57,11 +57,17 @@ func (steam *steamUser) updateData(token, id string) (bool, bool, error){
         } `json:"response"`
     }
 
-    var steamuser userJSON    
+	var steamuser userJSON    
 
     if err := json.Unmarshal(resp.Body(), &steamuser); err != nil {
         return false, false, err
     }    
+
+    if len(steamuser.Response.Players) == 0 {
+        fmt.Println("* len(steamuser.Response.Players) = 0 *")
+        fmt.Println(resp.Body())
+        return false, false, err
+    }
 
     if  steam.nickName == steamuser.Response.Players[0].Name && 
         steam.gameName == steamuser.Response.Players[0].GameName && 
