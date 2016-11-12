@@ -8,7 +8,7 @@ import (
     "github.com/go-ini/ini"
 )
 
-var steamStatusName = [7]string {"Offline", "Online", "Busy", "Away", "Snooze", "Trading", "Looking to play"}
+var steamStatusName = [7]string {"Offline", "Online", "Busy", "Away", "Snooze", "Looking to trade", "Looking to play"}
 
 type steamUser struct {
     nickName string
