@@ -8,7 +8,7 @@ import (
     "github.com/go-ini/ini"
 )
 
-var steamStatusName = [7]string {"Offline", "Online", "Busy", "Away", "Snooze", "Looking to trade", "Looking to play"}
+var steamStatusName = [7]string {"Offline", "Online", "Busy", "Away", "Snooze", "Trading", "Looking to play"}
 
 type steamUser struct {
     nickName string
@@ -23,7 +23,7 @@ type iniFile struct {
 }
 
 func (i *iniFile) Load(filename string) error {
-	file, err := ini.InsensitiveLoad(filename)
+    file, err := ini.InsensitiveLoad(filename)
 
 	if err != nil {
 		return err
